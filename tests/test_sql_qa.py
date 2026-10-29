@@ -120,3 +120,23 @@ def test_rechazo_del_modelo_con_resultado_valido_no_gana(con, parser):
 def test_cifras_decimales_conservan_precision():
     df = pd.DataFrame({"a": [24295.77], "b": [8.1], "c": [-3.5], "d": [1234567.0]})
     assert render_rows(df) == "a: 24.295,77; b: 8,1; c: -3,5; d: 1.234.567"
+
+
+def test_router_rankings_y_cual_es():
+    for q in ("¿Cuáles son las 3 marcas con más registros en 2026?", "¿En qué mes de 2026 hubo más registros?",
+              "¿En qué provincia se registraron más vehículos BYD en 2026?", "¿Cuál es la marca con más registros en Guayas?",
+              "¿Cuáles son las marcas más vendidas en 2026?"):
+        assert wants_sql(q), q
+    for q in ("¿Cuál es la capital de Francia?", "¿Qué significa la variable avalúo?",
+              "¿Cuáles son las marcas más vendidas según AEADE?", "¿Cómo estuvo el mercado en marzo de 2026?"):
+        assert not wants_sql(q), q
+
+
+def test_sin_datos_rechaza_en_lugar_de_inventar(con, parser):
+    llm = FakeLLM("SIN_DATOS")
+    pipe = SQLPipeline(con, llm, parser)
+    ans = pipe.answer("¿Cuántos vehículos usados se vendieron en 2026?")
+    assert ans.route == "sql" and "No encuentro" in ans.text and "solo vehículos nuevos" in ans.text and not ans.table
+    # un SQL valido que ademas menciona SIN_DATOS en un comentario de texto no cuenta como rechazo
+    llm2 = FakeLLM("SIN_DATOS\n" + KIA_SQL, "Kia registró 2 vehículos.")
+    assert SQLPipeline(con, llm2, parser).answer("¿Cuántos Kia se registraron en 2026?").table == [{"registros": 2}]

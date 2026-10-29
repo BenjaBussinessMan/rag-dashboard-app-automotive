@@ -9,13 +9,18 @@ from src.retrieval.query import norm
 NUMERIC = re.compile(
     r"\b(cuant[oa]s?|total|suma|sumar|promedio|media|mediana|porcentaje|proporcion|cuota|participacion|"
     r"numero de|cantidad de|maximo|minimo|mas caro|mas barato|crecimiento|crecio|crecieron|variacion|diferencia)\b")
+# Rankings y "cual/en que ...": tambien son consultas de datos estructurados.
+RANKING = re.compile(
+    r"\b(\d+ (marcas|provincias|modelos|combustibles|clases)|cuales son las? \w+|"
+    r"mas (registros|registrad\w+|vendid\w+)|(en|con) que (mes|provincia|marca|combustible|clase)|"
+    r"cual es (la|el) (marca|provincia|combustible|modelo|clase|mes)|que (marca|provincia|combustible|clase) )")
 # Fuentes que solo existen como texto: el SQL no las cubre.
 DOCUMENT_ONLY = re.compile(r"\b(aeade|boletin|boletines|pdf|diccionario|variable|significa|definicion)\b")
 
 
 def wants_sql(question: str) -> bool:
     q = norm(question).lower()
-    return bool(NUMERIC.search(q)) and not DOCUMENT_ONLY.search(q)
+    return bool(NUMERIC.search(q) or RANKING.search(q)) and not DOCUMENT_ONLY.search(q)
 
 
 class Assistant:

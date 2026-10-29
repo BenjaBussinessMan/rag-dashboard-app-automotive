@@ -29,6 +29,27 @@ def normalize(df: pd.DataFrame) -> list[tuple]:
     return rows
 
 
+def _value_eq(gold, got) -> bool:
+    if isinstance(gold, float) and isinstance(got, float):
+        return abs(gold - got) <= (0.5 if gold.is_integer() else 0.05) + 1e-9  # solo diferencias de redondeo
+    return gold == got
+
+
+def matches(got: list[tuple] | None, gold: list[tuple]) -> bool:
+    """Tolerante: mismas filas y, en cada una, los valores esperados aparecen en orden aunque haya columnas extra."""
+    if got is None or len(got) != len(gold):
+        return False
+    for g_row, r_row in zip(gold, got):
+        pos = 0
+        for gv in g_row:
+            while pos < len(r_row) and not _value_eq(gv, r_row[pos]):
+                pos += 1
+            if pos == len(r_row):
+                return False
+            pos += 1
+    return True
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default=DEFAULT_MODEL)
@@ -48,17 +69,28 @@ def main() -> int:
         gold = normalize(con.execute(item["gold"]).df())
         generated = pipeline.generate(item["q"])
         sql, got = (None, None) if generated is None else (generated[0], normalize(generated[1]))
-        ok = got == gold
-        results.append({"q": item["q"], "ok": ok, "sql": sql, "got": got, "gold": gold,
+        ok = matches(got, gold)
+        results.append({"q": item["q"], "category": item.get("category", "general"), "ok": ok,
+                        "ok_strict": got == gold, "sql": sql, "got": got, "gold": gold,
                         "seconds": round(time.time() - t0, 1)})
         print(f"[{'OK' if ok else 'FALLA'}] {item['q']}  ({results[-1]['seconds']} s)")
         if not ok:
             print(f"    esperado: {gold}\n    obtenido: {got}\n    sql: {sql}")
 
     n_ok = sum(r["ok"] for r in results)
-    print(f"\nExactitud de ejecucion ({args.model}): {n_ok}/{len(results)}")
+    by_cat: dict = {}
+    for r in results:
+        c = by_cat.setdefault(r["category"], {"ok": 0, "n": 0})
+        c["n"] += 1
+        c["ok"] += r["ok"]
+    n_strict = sum(r["ok_strict"] for r in results)
+    print(f"\nExactitud de ejecucion ({args.model}): {n_ok}/{len(results)} (estricta: {n_strict}/{len(results)})")
+    for cat, c in by_cat.items():
+        print(f"  {cat:<18}{c['ok']}/{c['n']}")
+    summary = {"model": args.model, "ok": n_ok, "ok_strict": n_strict, "n": len(results), "by_category": by_cat,
+               "mean_seconds": round(sum(r["seconds"] for r in results) / len(results), 1), "results": results}
     out = ROOT / "data" / "processed" / f"sql_eval_{args.model.replace(':', '_')}.json"
-    out.write_text(json.dumps(results, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
+    out.write_text(json.dumps(summary, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
     return 0
 
 

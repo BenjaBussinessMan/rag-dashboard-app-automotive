@@ -1,8 +1,22 @@
 [theme]
-primaryColor = "#2a78d6"
+base = "light"
+primaryColor = "#0033E2"
+backgroundColor = "#F2F4F7"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#1F2933"
+font = "sans serif"
+
+[theme.sidebar]
+backgroundColor = "#0F2F52"
+secondaryBackgroundColor = "#173F69"
+textColor = "#DCE7F3"
+primaryColor = "#5B9DFF"
 
 [server]
 headless = true
+
+[client]
+toolbarMode = "minimal"
 
 [browser]
 gatherUsageStats = false

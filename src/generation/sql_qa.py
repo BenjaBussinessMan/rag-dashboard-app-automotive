@@ -12,6 +12,7 @@ from src.generation.rag import REFUSAL, Answer
 from src.retrieval.hybrid import Hit
 
 SOURCE = "SRI datos abiertos (consulta SQL)"
+NO_DATA = "SIN_DATOS"
 MAX_ROWS = 30
 
 SQL_SYSTEM = """Eres un experto en DuckDB. Escribe UNA consulta SQL que responda la pregunta sobre la tabla `vehiculos`.
@@ -29,6 +30,12 @@ Reglas:
 - Conteos: count(*) con alias `registros`. Porcentajes: round(100.0 * parte / total, 1) con alias `porcentaje`. Promedio/mediana de avalúo: round(...) con alias `avaluo_promedio` / `avaluo_mediano`.
 - Si la pregunta no menciona un año, no filtres por año: agrupa por anio.
 - Al comparar años, usa el mismo rango de meses en ambos.
+- El campo `modelo` guarda la ficha completa (p. ej. 'COROLLA 1.8 4P 4X2 TM'): para buscar un modelo usa
+  modelo ILIKE '%COROLLA%', nunca igualdad exacta.
+- Rangos de meses: "entre enero y junio" es mes BETWEEN 1 AND 6; "hasta septiembre" es mes <= 9.
+- Devuelve solo las columnas que pide la pregunta (sin porcentajes ni totales de más).
+- La tabla solo tiene vehículos NUEVOS registrados: no hay usados, precios de venta, opiniones ni pronósticos.
+  Si la pregunta pide algo que no se puede calcular con estas columnas, responde únicamente: SIN_DATOS
 - Responde solo con el SQL dentro de un bloque ```sql.
 
 Ejemplos:
@@ -110,8 +117,12 @@ class SQLPipeline:
         """Devuelve (sql, DataFrame) o None si no se logra una consulta valida y ejecutable."""
         messages = [{"role": "system", "content": SQL_SYSTEM + f"\nAlcance de los datos: {self.scope()}."},
                     {"role": "user", "content": f"Pregunta: {question}{self._hints(question)}"}]
+        self.no_data = False
         for attempt in range(2):
             raw = self.llm.chat(messages)
+            if NO_DATA in raw and not extract_sql(raw):
+                self.no_data = True  # la pregunta pide algo que la tabla no tiene (usados, precios, opiniones...)
+                return None
             sql = extract_sql(raw)
             try:
                 if not sql:
@@ -135,6 +146,9 @@ class SQLPipeline:
             msg = (f"{REFUSAL} (La base cargada no incluye {', '.join(map(str, missing))}; cubre {self.scope()}.)")
             return Answer(question, msg, Verdict(grounded=True), [], False, self.parser.parse(question), "sql")
         generated = self.generate(question)
+        if generated is None and self.no_data:
+            msg = f"{REFUSAL} (Los registros del SRI no incluyen ese dato; contienen {self.scope()}, solo vehículos nuevos.)"
+            return Answer(question, msg, Verdict(grounded=True), [], False, self.parser.parse(question), "sql")
         if generated is None:
             return None
         sql, df = generated

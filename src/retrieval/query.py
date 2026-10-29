@@ -15,7 +15,8 @@ COMBUSTIBLE_CUES = {
     "HIBRIDOS": ["HIBRIDO_GASOLINA_BATERIAS", "HIBRIDO_DIESEL_BATERIAS"],
 }
 COMPARACION = re.compile(r"\b(frente a|comparad[oa]|comparacion|crecimiento|crecio|variacion|versus|vs)\b")
-RANKING = re.compile(r"\b(lider|lidera|ranking|top|mas vendid\w*|concentra|mayor|principal(?:es)?|primer[oa]?)\b")
+RANKING = re.compile(r"\b(lider|lidera|ranking|top|mas (?:vendid|usad|comun|frecuent|popular)\w*|concentra|mayor|"
+                     r"principal(?:es)?|primer[oa]?)\b")
 ANUAL_TYPES = ["marca_anual", "provincia_anual", "combustible_anual"]
 
 
@@ -71,4 +72,6 @@ class QueryParser:
             filters["doc_type"] = ["ranking"]
         elif anios and not meses and (marcas or provincias or combustibles):
             filters["doc_type"] = ANUAL_TYPES
+        elif anios and meses and not (marcas or provincias or combustibles):
+            filters["doc_type"] = ["mercado_mensual"]  # mes + año sin entidad: resumen del mercado, no una marca
         return filters

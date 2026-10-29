@@ -1,11 +1,16 @@
 """Interfaz Streamlit: asistente RAG + dashboard del mercado. Consume la API (RAG_API_URL)."""
 
 import os
+import sys
+from pathlib import Path
 
 import altair as alt
 import pandas as pd
 import requests
 import streamlit as st
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import theme  # noqa: E402
 
 API_URL = os.environ.get("RAG_API_URL", "http://localhost:8000").rstrip("/")
 MESES_ABREV = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
@@ -18,6 +23,9 @@ EJEMPLOS = [
     "¿Cómo estuvo el mercado automotriz en marzo de 2026?",
     "¿Cuánto crecieron las ventas entre enero y septiembre de 2026 según AEADE?",
 ]
+MODOS = {"Automático": "auto", "Documentos": "rag", "SQL exacto": "sql"}
+PAGINAS = {":material/forum:  Asistente": "asistente", ":material/monitoring:  Dashboard": "dashboard",
+           ":material/info:  Acerca de": "acerca"}
 
 st.set_page_config(page_title="Mercado automotriz Ecuador", layout="wide")
 
@@ -86,37 +94,61 @@ def render_response(resp: dict) -> None:
                + (" · se reintentó una vez" if resp["retried"] else ""))
 
 
-def tab_asistente(model: str | None, k: int, route: str) -> None:
+def page_asistente(health: dict | None) -> None:
+    theme.page_header("Asistente", "Pregunta sobre los registros de vehículos nuevos del SRI y los boletines de AEADE.")
+
+    with theme.card("ajustes"):
+        theme.card_title("Respuesta", "Cómo se calcula la respuesta y con qué modelo local.")
+        c1, c2, c3 = st.columns([1.7, 1.2, 1])
+        modo = c1.segmented_control("Modo de respuesta", list(MODOS), default="Automático", key="modo",
+                                    help="Automático usa SQL para preguntas de cantidades (cuántos, porcentaje, "
+                                         "promedio, rankings) y documentos para el resto.") or "Automático"
+        model = None
+        if health:
+            models = health["models"] or [health["default_model"]]
+            default = models.index(health["default_model"]) if health["default_model"] in models else 0
+            model = c2.selectbox("Modelo local", models, index=default,
+                                 help="Los modelos de 7B son más fiables pero más lentos.")
+        k = c3.slider("Fragmentos a recuperar", 3, 8, 5)
+
     st.session_state.setdefault("history", [])
     pending = st.session_state.pop("pending", None)
 
-    for turn in st.session_state.history:
-        with st.chat_message("user"):
-            st.write(turn["question"])
-        with st.chat_message("assistant"):
-            render_response(turn["response"])
+    with theme.card("conversacion"):
+        head, clear = st.columns([5, 1])
+        with head:
+            theme.card_title("Conversación")
+        if clear.button("Borrar", key="borrar", disabled=not st.session_state.history, width="stretch"):
+            st.session_state.history = []
+            st.rerun()
 
-    if not st.session_state.history and pending is None:
-        st.write("Pregunta sobre registros de vehículos nuevos del SRI y los boletines de AEADE. Por ejemplo:")
-        cols = st.columns(2)
-        for i, ejemplo in enumerate(EJEMPLOS):
-            if cols[i % 2].button(ejemplo, key=f"ej{i}", width="stretch"):
-                st.session_state.pending = ejemplo
-                st.rerun()
+        for turn in st.session_state.history:
+            with st.chat_message("user"):
+                st.write(turn["question"])
+            with st.chat_message("assistant"):
+                render_response(turn["response"])
 
-    question = pending or st.chat_input("Escribe tu pregunta")
-    if question:
-        with st.chat_message("user"):
-            st.write(question)
-        with st.chat_message("assistant"):
-            try:
-                with st.spinner("Buscando en las fuentes y redactando la respuesta (puede tardar unos segundos)..."):
-                    resp = api_ask(question, model, k, route)
-            except ApiError as exc:
-                st.error(str(exc))
-                return
-            render_response(resp)
-        st.session_state.history.append({"question": question, "response": resp})
+        if not st.session_state.history and pending is None:
+            st.caption("Prueba con una de estas preguntas:")
+            cols = st.columns(2)
+            for i, ejemplo in enumerate(EJEMPLOS):
+                if cols[i % 2].button(ejemplo, key=f"ej{i}", width="stretch"):
+                    st.session_state.pending = ejemplo
+                    st.rerun()
+
+        question = pending or st.chat_input("Escribe tu pregunta")
+        if question:
+            with st.chat_message("user"):
+                st.write(question)
+            with st.chat_message("assistant"):
+                try:
+                    with st.spinner("Buscando en las fuentes y redactando la respuesta (puede tardar unos segundos)..."):
+                        resp = api_ask(question, model, k, MODOS[modo])
+                except ApiError as exc:
+                    st.error(str(exc))
+                    return
+                render_response(resp)
+            st.session_state.history.append({"question": question, "response": resp})
 
 
 # ---------------------------------------------------------------- dashboard
@@ -144,7 +176,7 @@ def line_chart(df: pd.DataFrame, anios: list[int]) -> alt.Chart:
     labels = alt.Chart(ultimo).mark_text(dy=-12, fontWeight="bold").encode(
         x=alt.X("mes_txt:N", sort=MESES_ABREV), y="registros:Q", text="anio:N",
         color=alt.Color("anio:N", scale=scale, legend=None))
-    return (lines + points + labels).properties(height=340)
+    return (lines + points + labels).properties(height=320).configure(background="rgba(0,0,0,0)")
 
 
 def bar_chart(df: pd.DataFrame) -> alt.Chart:
@@ -156,10 +188,10 @@ def bar_chart(df: pd.DataFrame) -> alt.Chart:
         tooltip=[alt.Tooltip("nombre:N", title=""), alt.Tooltip("registros_txt:N", title="Registros"),
                  alt.Tooltip("participacion_txt:N", title="Participación")])
     texto = base.mark_text(align="left", dx=5).encode(x="registros:Q", text="participacion_txt:N")
-    return (bars + texto).properties(height=max(180, 30 * len(df)))
+    return (bars + texto).properties(height=max(180, 30 * len(df))).configure(background="rgba(0,0,0,0)")
 
 
-def tab_dashboard() -> None:
+def page_dashboard() -> None:
     try:
         meta = cached_get("/stats/meta")
         kpis = cached_get("/stats/kpis")
@@ -168,95 +200,100 @@ def tab_dashboard() -> None:
         return
 
     act, ant = kpis["actual"], kpis.get("anterior")
-    c1, c2, c3 = st.columns(3)
-    c1.metric(f"Registros {act['anio']} ({kpis['periodo']})", fmt(act["registros"]),
-              None if kpis["variacion_pct"] is None else f"{kpis['variacion_pct']:+.1f} % vs {ant['anio']}".replace(".", ","))
-    c2.metric("Eléctricos e híbridos", f"{act['electrificados_pct']:.1f} %".replace(".", ","),
-              None if not ant else f"{act['electrificados_pct'] - ant['electrificados_pct']:+.1f} pp vs {ant['anio']}".replace(".", ","))
-    c3.metric("Marca líder", act["marca_lider"] or "-")
-    st.caption("Segmento: automóvil, camión y camioneta. Fuente: SRI Ecuador, vehículos nuevos (fecha de proceso). "
-               "La comparación usa el mismo rango de meses porque el último año está incompleto "
-               f"(datos hasta {meta['cobertura'][str(act['anio'])]}).")
+    theme.page_header("Dashboard", f"Registros de vehículos nuevos del SRI, {kpis['periodo']} de {act['anio']} "
+                                   f"(datos hasta {meta['cobertura'][str(act['anio'])]}).")
 
-    st.subheader("Registros por mes")
-    f1, f2, f3, f4 = st.columns(4)
-    marca = f1.selectbox("Marca", ["Todas"] + meta["marcas"])
-    combustible = f2.selectbox("Combustible", ["Todas"] + meta["combustibles"])
-    provincia = f3.selectbox("Provincia", ["Todas"] + meta["provincias"])
-    clase = f4.selectbox("Clase", ["Todas"] + meta["clases"])
-    mensual = pd.DataFrame(cached_get("/stats/mensual", marca=marca, combustible=combustible,
-                                      provincia=provincia, clase=clase))
-    if mensual.empty:
-        st.info("No hay registros para esa combinación de filtros.")
-    else:
-        st.altair_chart(line_chart(mensual, meta["anios"]), width="stretch")
-        with st.expander("Ver tabla de datos"):
-            tabla = mensual.pivot(index="mes", columns="anio", values="registros").rename(index=lambda m: MESES_ABREV[m - 1])
-            st.dataframe(tabla, width="stretch")
+    with theme.card("resumen"):
+        theme.card_title("Resumen del periodo")
+        c1, c2, c3 = st.columns(3)
+        c1.metric(f"Registros {act['anio']} ({kpis['periodo']})", fmt(act["registros"]),
+                  None if kpis["variacion_pct"] is None else f"{kpis['variacion_pct']:+.1f} % vs {ant['anio']}".replace(".", ","))
+        c2.metric("Eléctricos e híbridos", f"{act['electrificados_pct']:.1f} %".replace(".", ","),
+                  None if not ant else f"{act['electrificados_pct'] - ant['electrificados_pct']:+.1f} pp vs {ant['anio']}".replace(".", ","))
+        c3.metric("Marca líder", act["marca_lider"] or "-")
+        st.caption("Segmento: automóvil, camión y camioneta. La comparación usa el mismo rango de meses "
+                   "porque el último año está incompleto.")
 
-    st.subheader("Ranking")
-    r1, r2, r3, r4 = st.columns(4)
-    dimension = r1.selectbox("Agrupar por", ["marca", "provincia", "combustible", "clase"])
-    anio = r2.selectbox("Año", list(reversed(meta["anios"])))
-    limite = r3.slider("Elementos", 5, 20, 10)
-    mismo = r4.checkbox(f"Solo {kpis['periodo']}", value=True,
-                        help="Compara años con el mismo rango de meses; el último año está incompleto.")
-    top = pd.DataFrame(cached_get("/stats/top", dimension=dimension, anio=anio, limit=limite,
-                                  mes_hasta=kpis["mes_corte"] if mismo else None))
-    if not top.empty:
-        st.altair_chart(bar_chart(top), width="stretch")
-        st.caption("El valor a la derecha de cada barra es la participación dentro del total filtrado.")
+    with theme.card("mensual"):
+        theme.card_title("Registros por mes", "Filtra por marca, combustible, provincia o clase.")
+        f1, f2, f3, f4 = st.columns(4)
+        marca = f1.selectbox("Marca", ["Todas"] + meta["marcas"])
+        combustible = f2.selectbox("Combustible", ["Todas"] + meta["combustibles"])
+        provincia = f3.selectbox("Provincia", ["Todas"] + meta["provincias"])
+        clase = f4.selectbox("Clase", ["Todas"] + meta["clases"])
+        mensual = pd.DataFrame(cached_get("/stats/mensual", marca=marca, combustible=combustible,
+                                          provincia=provincia, clase=clase))
+        if mensual.empty:
+            st.info("No hay registros para esa combinación de filtros.")
+        else:
+            st.altair_chart(line_chart(mensual, meta["anios"]), width="stretch")
+            with st.expander("Ver tabla de datos"):
+                tabla = mensual.pivot(index="mes", columns="anio", values="registros").rename(index=lambda m: MESES_ABREV[m - 1])
+                st.dataframe(tabla, width="stretch")
+
+    with theme.card("ranking"):
+        theme.card_title("Ranking", "Participación dentro del total filtrado.")
+        r1, r2, r3, r4 = st.columns(4)
+        dimension = r1.selectbox("Agrupar por", ["marca", "provincia", "combustible", "clase"])
+        anio = r2.selectbox("Año", list(reversed(meta["anios"])))
+        limite = r3.slider("Elementos", 5, 20, 10)
+        mismo = r4.checkbox(f"Solo {kpis['periodo']}", value=True,
+                            help="Compara años con el mismo rango de meses; el último año está incompleto.")
+        top = pd.DataFrame(cached_get("/stats/top", dimension=dimension, anio=anio, limit=limite,
+                                      mes_hasta=kpis["mes_corte"] if mismo else None))
+        if not top.empty:
+            st.altair_chart(bar_chart(top), width="stretch")
+            st.caption("El valor a la derecha de cada barra es la participación dentro del total filtrado.")
 
 
-def tab_acerca() -> None:
-    st.markdown("""
-**Cómo funciona.** La pregunta se analiza para detectar año, mes, marca, provincia y combustible. Se recuperan
-fragmentos con búsqueda híbrida (BM25 y embeddings BGE-M3, fusionados con RRF). Un LLM local (Ollama)
-redacta la respuesta usando solo esos fragmentos, y un guardrail verifica que cada cifra aparezca en el
-fragmento que se cita; si no, la respuesta se rechaza.
+def page_acerca() -> None:
+    theme.page_header("Acerca de", "Cómo funciona el asistente y qué límites tiene.")
+    with theme.card("como"):
+        theme.card_title("Cómo funciona")
+        st.markdown(
+            "La pregunta se analiza para detectar año, mes, marca, provincia y combustible. Si pide una cantidad "
+            "(cuántos, porcentaje, promedio, ranking), un modelo local escribe una consulta SQL que se ejecuta "
+            "sobre los registros del SRI. En los demás casos se recuperan fragmentos con búsqueda híbrida "
+            "(BM25 y embeddings BGE-M3, fusionados con RRF) y el modelo redacta la respuesta solo con ellos. "
+            "Un guardrail verifica que cada cifra aparezca en la fuente citada; si no, la respuesta se rechaza.")
+    with theme.card("fuentes"):
+        theme.card_title("Fuentes y límites")
+        st.markdown(
+            "- **SRI (datos abiertos):** registros de vehículos nuevos 2025-2026, automóvil, camión y camioneta.\n"
+            "- **AEADE:** boletines mensuales de julio a septiembre de 2026.\n"
+            "- Las cifras del SRI y de AEADE **no coinciden** (cobertura y definición de venta distintas); "
+            "cada respuesta indica de cuál viene cada cifra.\n"
+            "- 2026 está incompleto. El guardrail comprueba que las cifras existan en la fuente citada, no que "
+            "esa fuente sea la más adecuada: con modelos pequeños conviene revisar el SQL y las fuentes.")
 
-**Fuentes.** Registros de vehículos nuevos del SRI (datos abiertos) y boletines mensuales de AEADE.
-Las cifras de ambas fuentes **no coinciden** (cobertura y definición de venta distintas): la respuesta
-siempre indica de cuál viene cada cifra.
 
-**Límites.** El año 2026 está incompleto. El guardrail comprueba que las cifras existan en la fuente citada,
-no que esa fuente sea la más adecuada: con modelos pequeños conviene revisar las fuentes.
-""")
-
+# ---------------------------------------------------------------- estructura
 
 def main() -> None:
-    st.title("Asistente del mercado automotriz de Ecuador")
-    with st.sidebar:
-        st.header("Configuración")
-        try:
-            health = cached_get("/health")
-        except ApiError as exc:
-            st.error(str(exc))
-            health = None
-        model = None
-        if health:
-            models = health["models"] or [health["default_model"]]
-            model = st.selectbox("Modelo local", models,
-                                 index=models.index(health["default_model"]) if health["default_model"] in models else 0,
-                                 help="Los modelos de 7B son más fiables pero más lentos.")
-            if not health["ollama"]:
-                st.warning("Ollama no responde: el asistente no podrá generar respuestas.")
-            st.caption(f"{health['corpus_docs']} documentos indexados")
-        modos = {"Automático": "auto", "Solo documentos": "rag", "Solo cifras exactas (SQL)": "sql"}
-        route = modos[st.radio("Cómo responder", list(modos), help="Automático usa SQL para preguntas de cantidades "
-                               "(cuántos, porcentaje, promedio) y documentos para el resto.")]
-        k = st.slider("Fragmentos a recuperar", 3, 8, 5)
-        if st.button("Borrar conversación"):
-            st.session_state.history = []
-            st.rerun()
+    theme.inject()
+    try:
+        health = cached_get("/health")
+        health_error = None
+    except ApiError as exc:
+        health, health_error = None, str(exc)
 
-    t1, t2, t3 = st.tabs(["Asistente", "Dashboard", "Acerca de"])
-    with t1:
-        tab_asistente(model, k, route)
-    with t2:
-        tab_dashboard()
-    with t3:
-        tab_acerca()
+    with st.sidebar:
+        theme.brand()
+        theme.nav_label("NAVEGACIÓN")
+        pagina = PAGINAS[st.radio("Sección", list(PAGINAS), label_visibility="collapsed", key="pagina")]
+        st.divider()
+        theme.nav_label("ESTADO")
+        if health:
+            theme.status("API conectada")
+            theme.status(f"Ollama: {len(health['models'])} modelos" if health["ollama"] else "Ollama sin respuesta",
+                         bool(health["ollama"]))
+            theme.status(f"{health['corpus_docs']} documentos indexados")
+        else:
+            theme.status("API sin conexión", False)
+
+    if health_error and pagina == "asistente":
+        st.error(health_error)
+    {"asistente": lambda: page_asistente(health), "dashboard": page_dashboard, "acerca": page_acerca}[pagina]()
 
 
 main()

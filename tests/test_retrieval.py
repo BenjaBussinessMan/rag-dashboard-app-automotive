@@ -83,3 +83,12 @@ def test_query_parser():
     assert p.parse("Kia frente a 2025 y 2026")["doc_type"] == ["comparativo_periodo"]
     assert p.parse("hola qué tal") == {}
     assert p.parse("qué provincia lidera en 2026")["doc_type"] == ["ranking"]
+
+
+def test_query_parser_mes_sin_entidad_y_ranking_amplio():
+    from src.retrieval.query import QueryParser
+    corpus = pd.DataFrame({"marca": ["KIA"], "anio": [2025]})
+    p = QueryParser(corpus)
+    assert p.parse("total de vehículos registrados en enero de 2025")["doc_type"] == ["mercado_mensual"]
+    assert p.parse("registros de Kia en enero de 2025").get("doc_type") is None
+    assert p.parse("qué combustible es el más usado en 2025")["doc_type"] == ["ranking"]
