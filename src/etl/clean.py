@@ -120,22 +120,33 @@ def quality_report(df: pd.DataFrame, year: int) -> dict:
         "nulls": {c: int(n) for c, n in df.isna().sum().items() if n},
         "avaluo_le_0": int((df["avaluo"] <= 0).sum()),
         "fecha_proceso": [str(df["fecha_proceso"].min().date()), str(df["fecha_proceso"].max().date())],
+        "canton_sin_resolver": int(df["provincia"].isna().sum()) if "provincia" in df else None,
         "signos_interrogacion": int(sum(df[c].astype("string").str.contains(r"\?", regex=True).sum()
                                         for c in TEXT_COLS if c in df.columns)),
     }
 
 
 def run_etl(raw_dir: Path, out_dir: Path, years=None) -> list[dict]:
+    from src.etl import catalogs  # import tardio: catalogs depende de strip_accents de este modulo
+
     """CSV crudos -> data/processed/vehiculos_nuevos/anio_archivo=YYYY/*.parquet + etl_report.json"""
     files = sorted(raw_dir.glob("SRI_Vehiculos_Nuevos_*.csv"))
     reports = []
+    xlsx = raw_dir / catalogs.DICTIONARY_FILE
+    dim_canton = catalogs.load_dim_canton(xlsx)
+    dim_color = catalogs.load_dim_color(xlsx)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    dim_canton.to_parquet(out_dir / "dim_canton.parquet", index=False)
+    dim_color.to_parquet(out_dir / "dim_color.parquet", index=False)
+    (out_dir / "data_dictionary.json").write_text(
+        json.dumps(catalogs.load_data_dictionary(xlsx), indent=2, ensure_ascii=False), encoding="utf-8")
     dataset = out_dir / "vehiculos_nuevos"
     for path in files:
         year = int(re.search(r"(\d{4})", path.stem).group(1))
         if years and year not in years:
             continue
         logger.info("%s: procesando", path.name)
-        df = clean_year(path, year)
+        df = catalogs.resolve_canton(clean_year(path, year), dim_canton)
         part = dataset / f"anio_archivo={year}"
         part.mkdir(parents=True, exist_ok=True)
         for old in part.glob("*.parquet"):

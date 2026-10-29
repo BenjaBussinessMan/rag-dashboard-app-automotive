@@ -47,3 +47,22 @@ def test_utf8_con_bom(tmp_path):
     assert df["categoria"].iloc[0] == 1
     assert df["canton_nombre"].iloc[0] == "QUITO"
     assert pd.isna(df["canton_codigo"].iloc[0])
+
+
+def test_resolve_canton():
+    from src.etl import catalogs
+    dim = pd.DataFrame({
+        "canton_codigo": ["10921", "20402", "11302", "32201"],
+        "canton_nombre": ["PLAYAS (GENERAL VILLAMIL)", "BOLIVAR", "BOLIVAR", "FRANCISCO DE ORELLANA"],
+        "provincia_codigo": ["109", "204", "113", "322"],
+        "provincia": ["GUAYAS", "CARCHI", "MANABI", "ORELLANA"],
+    })
+    df = pd.DataFrame({
+        "canton_codigo": pd.Series([None, None, None, None, "20402", "22302"], dtype="string"),
+        "canton_nombre": pd.Series(["PLAYAS", "General Villamil", "BOLIVAR", "ORELLANA", None, None], dtype="string"),
+    })
+    out = catalogs.resolve_canton(df, dim)
+    assert out["canton_codigo"].astype("string").tolist()[:4] == ["10921", "10921", pd.NA, "32201"]
+    assert out["provincia"].astype("string").tolist()[:2] == ["GUAYAS", "GUAYAS"]
+    assert pd.isna(out["provincia"].iloc[2])  # BOLIVAR ambiguo
+    assert out["canton_nombre"].astype("string").iloc[4] == "BOLIVAR"
