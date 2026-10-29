@@ -15,6 +15,7 @@ COMBUSTIBLE_CUES = {
     "HIBRIDOS": ["HIBRIDO_GASOLINA_BATERIAS", "HIBRIDO_DIESEL_BATERIAS"],
 }
 COMPARACION = re.compile(r"\b(frente a|comparad[oa]|comparacion|crecimiento|crecio|variacion|versus|vs)\b")
+RANKING = re.compile(r"\b(lider|lidera|ranking|top|mas vendid\w*|concentra|mayor|principal(?:es)?|primer[oa]?)\b")
 ANUAL_TYPES = ["marca_anual", "provincia_anual", "combustible_anual"]
 
 
@@ -66,6 +67,8 @@ class QueryParser:
         # intencion por tipo de documento
         if COMPARACION.search(norm(query).lower()) and len(anios) >= 1 and not meses:
             filters["doc_type"] = ["comparativo_periodo"]
+        elif RANKING.search(norm(query).lower()) and not meses and not marcas and not provincias and not combustibles:
+            filters["doc_type"] = ["ranking"]
         elif anios and not meses and (marcas or provincias or combustibles):
             filters["doc_type"] = ANUAL_TYPES
         return filters

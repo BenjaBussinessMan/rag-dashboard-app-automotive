@@ -14,12 +14,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Pregunta al asistente (RAG local con Ollama)")
     parser.add_argument("question")
     parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument("--num-gpu", type=int, default=None, help="0 = solo CPU")
     parser.add_argument("-k", type=int, default=5)
     parser.add_argument("--rerank", action="store_true", help="activa el reranker BGE (más lento)")
     args = parser.parse_args()
 
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    llm = OllamaClient(args.model)
+    llm = OllamaClient(args.model, num_gpu=args.num_gpu)
     try:
         llm.check()
     except OllamaUnavailable as exc:

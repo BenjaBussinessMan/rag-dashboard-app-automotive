@@ -12,8 +12,10 @@ class OllamaUnavailable(RuntimeError):
 
 class OllamaClient:
     def __init__(self, model: str = DEFAULT_MODEL, base_url: str = DEFAULT_URL, num_ctx: int = 8192,
-                 timeout: float = 300):
+                 timeout: float = 600, num_gpu: int | None = None):
+        """num_gpu=0 fuerza CPU (util si el modelo no cabe en la VRAM y el reparto GPU/CPU falla)."""
         self.model, self.base_url, self.num_ctx, self.timeout = model, base_url.rstrip("/"), num_ctx, timeout
+        self.num_gpu = num_gpu
 
     def installed_models(self) -> list[str]:
         try:
@@ -33,9 +35,11 @@ class OllamaClient:
 
     def chat(self, messages: list[dict], temperature: float = 0.0) -> str:
         try:
+            options = {"temperature": temperature, "num_ctx": self.num_ctx}
+            if self.num_gpu is not None:
+                options["num_gpu"] = self.num_gpu
             r = requests.post(f"{self.base_url}/api/chat", timeout=self.timeout, json={
-                "model": self.model, "messages": messages, "stream": False,
-                "options": {"temperature": temperature, "num_ctx": self.num_ctx}})
+                "model": self.model, "messages": messages, "stream": False, "options": options})
             r.raise_for_status()
         except requests.RequestException as exc:
             raise OllamaUnavailable(f"Fallo la llamada a Ollama: {exc}") from exc

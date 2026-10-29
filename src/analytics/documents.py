@@ -222,6 +222,30 @@ class CorpusBuilder:
                     cur, marca=marca))
         return docs
 
+    def rankings(self) -> list[dict]:
+        """Rankings completos por año: responden '¿qué provincia/marca/combustible lidera?'."""
+        specs = [("provincia", "provincias", "Ranking de provincias por registros", None),
+                 ("marca", "marcas", "Ranking de las 20 marcas con más registros", 20),
+                 ("combustible", "combustibles", "Ranking de combustibles por registros", None)]
+        docs = []
+        for col, plural, titulo, limite in specs:
+            lim = f"QUALIFY row_number() OVER (PARTITION BY anio ORDER BY c DESC) <= {limite}" if limite else ""
+            rows = self.con.execute(f"""
+                WITH g AS (SELECT anio, {col} AS k, count(*) c FROM vehiculos
+                           WHERE {col} IS NOT NULL GROUP BY anio, {col})
+                SELECT anio, k, c, sum(c) OVER (PARTITION BY anio) total FROM g {lim}
+                ORDER BY anio, c DESC""").fetchall()
+            por_anio: dict = {}
+            for anio, k, c, total in rows:
+                por_anio.setdefault(anio, []).append((k, c, total))
+            for anio, items in por_anio.items():
+                total = items[0][2]
+                lista = "; ".join(f"{i}. {k} ({n(c)}, {pct(c / total * 100)})" for i, (k, c, _) in enumerate(items, 1))
+                text = (f"{titulo}, año {anio}. {self._ctx()} Líder: {items[0][0]} con {n(items[0][1])} registros. "
+                        f"{lista}.{self._nota(anio)}")
+                docs.append(_doc("ranking", f"ranking:{plural}:{anio}", text, anio))
+        return docs
+
     def diccionario(self) -> list[dict]:
         if not self.dictionary_path or not Path(self.dictionary_path).exists():
             return []
@@ -233,6 +257,7 @@ class CorpusBuilder:
     def build(self) -> pd.DataFrame:
         docs = (self.mercado_mensual() + self.marca_anual() + self.marca_mensual()
                 + self.provincia_anual() + self.combustible_anual() + self.comparativo_periodo()
+                + self.rankings()
                 + self.diccionario())
         df = pd.DataFrame(docs)
         assert df["doc_id"].is_unique, "doc_id duplicados"

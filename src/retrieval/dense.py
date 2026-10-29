@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -10,6 +11,10 @@ DEFAULT_MODEL = "BAAI/bge-m3"
 
 
 def _device() -> str:
+    """RAG_EMBED_DEVICE=cpu deja la GPU libre para el LLM (los embeddings del corpus ya estan en disco)."""
+    forced = os.environ.get("RAG_EMBED_DEVICE")
+    if forced:
+        return forced
     import torch
     return "cuda" if torch.cuda.is_available() else "cpu"
 

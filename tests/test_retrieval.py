@@ -82,3 +82,4 @@ def test_query_parser():
     assert p.parse("autos eléctricos en Manabí 2026")["combustible"] == ["ELECTRICO"]
     assert p.parse("Kia frente a 2025 y 2026")["doc_type"] == ["comparativo_periodo"]
     assert p.parse("hola qué tal") == {}
+    assert p.parse("qué provincia lidera en 2026")["doc_type"] == ["ranking"]

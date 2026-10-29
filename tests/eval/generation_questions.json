@@ -1,0 +1,8 @@
+[
+  {"q": "¿Cuántos vehículos registró Toyota en 2026 según el SRI?", "expected": "marca_anual:TOYOTA:2026 -> 2.433"},
+  {"q": "¿Cuántos vehículos eléctricos se registraron en 2026 y qué marca lidera?", "expected": "combustible_anual:ELECTRICO:2026 -> 3.900, BYD"},
+  {"q": "¿Cómo estuvo el mercado automotriz en marzo de 2026?", "expected": "mercado_mensual:2026-03 -> 9.028"},
+  {"q": "¿Cuánto crecieron las ventas de vehículos entre enero y septiembre de 2026 según AEADE?", "expected": "aeade 2026-09 p4 -> 40,3 %, 123.927"},
+  {"q": "¿Qué provincia concentra más registros en 2025?", "expected": "provincia_anual:PICHINCHA:2025 -> 34.390"},
+  {"q": "¿Cuál es la capital de Francia?", "expected": "rechazo: fuera del corpus"}
+]

@@ -68,5 +68,23 @@ python scripts/ask.py "¿Cuántos vehículos registró Toyota en 2026?"
 - Recuperación: BM25 propio + embeddings BGE-M3 fusionados con RRF; filtros de metadatos extraídos de la
   pregunta (`src/retrieval/query.py`); reranker BGE opcional.
 - Generación: LLM local con Ollama. Requiere instalar Ollama (https://ollama.com) y `ollama pull qwen2.5:3b-instruct`.
-- Guardrail (`src/generation/guardrails.py`): toda cifra de la respuesta debe aparecer en los fragmentos
-  recuperados y toda cita `[n]` debe existir; si falla, se reintenta una vez y si persiste se rechaza la respuesta.
+- Guardrail (`src/generation/guardrails.py`): el sistema (no el modelo) atribuye las citas. Toda oración con cifras
+  debe tener todas sus cifras en un mismo fragmento recuperado, que es el que se cita; las oraciones sin cifras
+  deben apoyarse léxicamente en un fragmento. Si falla, se reintenta una vez y si persiste se rechaza la respuesta.
+  Limitación: verifica que la cifra exista en el fragmento citado, no que el fragmento responda a la pregunta.
+- `python scripts/eval_generation.py` corre preguntas reales por el pipeline completo (`tests/eval/generation_questions.json`).
+
+## Etapa 6: API y interfaz
+
+```
+python scripts/run_api.py                          # API FastAPI en http://127.0.0.1:8000 (docs en /docs)
+streamlit run app/streamlit_app.py                 # interfaz en http://localhost:8501
+```
+
+- Variables de entorno: `RAG_MODEL` (modelo por defecto de Ollama), `RAG_API_URL` (la usa Streamlit),
+  `RAG_CPU_ONLY_MODELS` (modelos que se ejecutan solo en CPU; por defecto `qwen2.5:7b-instruct`, que no cabe en 4 GB de VRAM),
+  `RAG_EMBED_DEVICE=cpu` (libera la GPU para el LLM), `RAG_RERANK=1` (activa el reranker).
+- Endpoints: `GET /health`, `POST /search`, `POST /ask`, `GET /stats/{meta,kpis,mensual,top}`.
+- La interfaz tiene tres pestañas: asistente (con fuentes y estado de verificación), dashboard (KPIs comparados en el
+  mismo rango de meses, serie mensual y ranking con filtros) y una nota sobre fuentes y límites.
+- La API usa CORS abierto y no tiene autenticación: es para desarrollo local; antes de exponerla hay que restringirlo.
