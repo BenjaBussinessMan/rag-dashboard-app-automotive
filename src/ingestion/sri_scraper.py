@@ -12,6 +12,8 @@ from requests.adapters import HTTPAdapter
 from tqdm import tqdm
 from urllib3.util.retry import Retry
 
+from src.utils.dates import parse_fecha
+
 logger = logging.getLogger(__name__)
 
 URL_TEMPLATE = "https://descargas.sri.gob.ec/download/datosAbiertos/SRI_Vehiculos_Nuevos_{year}.csv"
@@ -83,27 +85,13 @@ def _download(session: requests.Session, url: str, dest: Path) -> None:
     tmp.replace(dest)
 
 
-_MESES = {"ene": "01", "feb": "02", "mar": "03", "abr": "04", "may": "05", "jun": "06",
-          "jul": "07", "ago": "08", "sep": "09", "oct": "10", "nov": "11", "dic": "12"}
-
-
-def _parse_dates(serie: pd.Series) -> pd.Series:
-    """Los formatos varian por año: '2-dic-21', '9/12/2024', '20/11/2025'."""
-    texto = serie.astype(str).str.strip().str.lower()
-    for nombre, num in _MESES.items():
-        texto = texto.str.replace(f"-{nombre}-", f"/{num}/", regex=False)
-    parsed = pd.to_datetime(texto, format="%d/%m/%Y", errors="coerce")
-    corto = pd.to_datetime(texto, format="%d/%m/%y", errors="coerce")
-    return parsed.fillna(corto)
-
-
 def _describe(path: Path) -> dict:
     """Valida lectura y resume el archivo. La normalizacion de esquema es de otra etapa."""
     df = pd.read_csv(path, sep=CSV_SEP, encoding=CSV_ENCODING, low_memory=False, index_col=False)
     col = next((c for c in df.columns if c.upper().startswith(DATE_COLUMN_PREFIX)), None)
     if df.empty or col is None:
         raise ValueError(f"{path.name}: sin filas o sin columna '{DATE_COLUMN_PREFIX}*'")
-    fechas = _parse_dates(df[col])
+    fechas = parse_fecha(df[col])
     return {
         "rows": int(len(df)),
         "columns": list(df.columns),

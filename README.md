@@ -17,3 +17,16 @@ Los años cerrados se omiten si el tamaño remoto coincide; el año en curso sie
 Formato de los CSV: separador `;`, codificación `latin-1`.
 
 Tests: `python -m pytest`
+
+## Etapa 2: ETL a Parquet
+
+```
+python scripts/run_etl.py            # data/raw/*.csv -> data/processed/vehiculos_nuevos/
+```
+
+Unifica el esquema de los 6 años (encabezados, codificación UTF-8/latin-1, fechas, decimales con coma,
+caracteres dañados en el CSV 2025) y escribe Parquet particionado por `anio_archivo` más
+`data/processed/etl_report.json` con la calidad por año (≈3.2 M filas, ~18 MB).
+
+Limitación conocida: el cantón viene como código SRI en 2021-2025 y como nombre en 2026
+(`canton_codigo` / `canton_nombre`); no hay tabla de equivalencia.
