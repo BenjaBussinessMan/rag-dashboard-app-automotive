@@ -62,3 +62,15 @@ def test_run_select(tmp_path):
     con = connect(tmp_path, clases=("AUTOMOVIL",))
     out = run_select(con, "SELECT marca, count(*) AS n FROM vehiculos GROUP BY marca ORDER BY marca")
     assert out["n"].sum() == 6
+
+
+def test_sql_solo_tabla_vehiculos_y_sin_vectores_de_fuga():
+    ok = ("WITH t AS (SELECT marca, count(*) n FROM vehiculos GROUP BY marca) "
+          "SELECT * FROM t ORDER BY n DESC")
+    assert validate_select(ok)
+    for bad in ("SELECT * FROM otra_tabla", "SELECT * FROM vehiculos v JOIN secretos s ON 1=1",
+                "SELECT * FROM information_schema.tables", "SELECT * FROM duckdb_settings()",
+                "SELECT * FROM vehiculos -- comentario", "SELECT getenv('PATH')",
+                "SELECT * FROM read_parquet('x')", "SELECT * FROM parquet_scan('x')"):
+        with pytest.raises(UnsafeQuery):
+            validate_select(bad)

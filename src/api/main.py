@@ -14,6 +14,8 @@ from src.api import stats
 from src.api.schemas import AskRequest, AskResponse, SearchRequest, SearchResponse, Source
 from src.generation.ollama import DEFAULT_MODEL, OllamaClient, OllamaUnavailable
 from src.generation.rag import REFUSAL, RAGPipeline
+from src.generation.router import Assistant
+from src.generation.sql_qa import SQLPipeline
 from src.retrieval.service import PROCESSED, build_retriever
 
 # Modelos que no caben en la VRAM de la GPU de desarrollo (4 GB) y deben correr solo en CPU.
@@ -58,10 +60,13 @@ def create_app(retriever=None, llm_factory=None, con=None, default_model: str | 
         except OllamaUnavailable:
             return []
 
-    def pipeline_for(model: str, k: int) -> RAGPipeline:
+    def pipeline_for(model: str, k: int) -> Assistant:
         key = (model, k)
         if key not in state["pipelines"]:
-            state["pipelines"][key] = RAGPipeline(state["retriever"], llm_factory(model), k=k)
+            llm = llm_factory(model)
+            state["pipelines"][key] = Assistant(
+                RAGPipeline(state["retriever"], llm, k=k),
+                SQLPipeline(state["con"], llm, state["retriever"].parser))
         return state["pipelines"][key]
 
     @app.get("/health")
@@ -86,13 +91,14 @@ def create_app(retriever=None, llm_factory=None, con=None, default_model: str | 
                 installed = installed_models()
                 if installed and model not in installed:
                     raise HTTPException(400, f"Modelo no instalado: {model}. Disponibles: {', '.join(installed)}")
-                ans = pipeline_for(model, req.k).answer(req.question)
+                ans = pipeline_for(model, req.k).answer(req.question, req.route)
             except OllamaUnavailable as exc:
                 raise HTTPException(503, str(exc)) from exc
         return AskResponse(
             question=req.question, answer=ans.text, grounded=ans.verdict.grounded,
             refused=ans.text.startswith(REFUSAL), retried=ans.retried, problems=ans.verdict.problems,
-            filters=ans.filters, sources=_sources(ans.hits), model=model, seconds=round(time.time() - t0, 1))
+            filters=ans.filters, sources=_sources(ans.hits), model=model, seconds=round(time.time() - t0, 1),
+            route=ans.route, sql=ans.sql, table=ans.table)
 
     @app.get("/stats/meta")
     def stats_meta():

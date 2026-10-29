@@ -27,6 +27,9 @@ class Answer:
     hits: list = field(default_factory=list)
     retried: bool = False
     filters: dict = field(default_factory=dict)
+    route: str = "rag"          # "rag" (documentos) o "sql" (consulta exacta)
+    sql: str | None = None
+    table: list | None = None
 
 
 def format_fragments(hits) -> list[str]:

@@ -36,9 +36,10 @@ def api_get(path: str, **params):
         raise ApiError(f"No se pudo consultar la API en {API_URL}: {exc}") from exc
 
 
-def api_ask(question: str, model: str | None, k: int) -> dict:
+def api_ask(question: str, model: str | None, k: int, route: str = "auto") -> dict:
     try:
-        r = requests.post(f"{API_URL}/ask", json={"question": question, "model": model, "k": k}, timeout=900)
+        r = requests.post(f"{API_URL}/ask", json={"question": question, "model": model, "k": k, "route": route},
+                          timeout=900)
     except requests.RequestException as exc:
         raise ApiError(f"No se pudo conectar con la API en {API_URL}: {exc}") from exc
     if r.status_code != 200:
@@ -63,9 +64,18 @@ def render_response(resp: dict) -> None:
         st.info(resp["answer"])
     elif resp["grounded"]:
         st.markdown(resp["answer"])
-        st.caption("Respuesta verificada: cada cifra aparece en el fragmento citado.")
+        if resp.get("route") == "sql":
+            st.caption("Cifra calculada con una consulta SQL sobre los registros del SRI. "
+                       "Revisa la consulta en el detalle: un modelo pequeño puede plantearla mal.")
+        else:
+            st.caption("Respuesta verificada: cada cifra aparece en el fragmento citado.")
     else:
         st.warning(resp["answer"])
+    if resp.get("sql"):
+        with st.expander("Consulta SQL y resultado"):
+            st.code(resp["sql"], language="sql")
+            if resp.get("table"):
+                st.dataframe(pd.DataFrame(resp["table"]), width="stretch", hide_index=True)
     with st.expander(f"Fuentes consultadas ({len(resp['sources'])})"):
         for s in resp["sources"]:
             pagina = f", página {s['pagina']}" if s.get("pagina") else ""
@@ -76,7 +86,7 @@ def render_response(resp: dict) -> None:
                + (" · se reintentó una vez" if resp["retried"] else ""))
 
 
-def tab_asistente(model: str | None, k: int) -> None:
+def tab_asistente(model: str | None, k: int, route: str) -> None:
     st.session_state.setdefault("history", [])
     pending = st.session_state.pop("pending", None)
 
@@ -101,7 +111,7 @@ def tab_asistente(model: str | None, k: int) -> None:
         with st.chat_message("assistant"):
             try:
                 with st.spinner("Buscando en las fuentes y redactando la respuesta (puede tardar unos segundos)..."):
-                    resp = api_ask(question, model, k)
+                    resp = api_ask(question, model, k, route)
             except ApiError as exc:
                 st.error(str(exc))
                 return
@@ -232,6 +242,9 @@ def main() -> None:
             if not health["ollama"]:
                 st.warning("Ollama no responde: el asistente no podrá generar respuestas.")
             st.caption(f"{health['corpus_docs']} documentos indexados")
+        modos = {"Automático": "auto", "Solo documentos": "rag", "Solo cifras exactas (SQL)": "sql"}
+        route = modos[st.radio("Cómo responder", list(modos), help="Automático usa SQL para preguntas de cantidades "
+                               "(cuántos, porcentaje, promedio) y documentos para el resto.")]
         k = st.slider("Fragmentos a recuperar", 3, 8, 5)
         if st.button("Borrar conversación"):
             st.session_state.history = []
@@ -239,7 +252,7 @@ def main() -> None:
 
     t1, t2, t3 = st.tabs(["Asistente", "Dashboard", "Acerca de"])
     with t1:
-        tab_asistente(model, k)
+        tab_asistente(model, k, route)
     with t2:
         tab_dashboard()
     with t3:

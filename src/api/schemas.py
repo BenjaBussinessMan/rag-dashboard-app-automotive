@@ -7,6 +7,7 @@ class AskRequest(BaseModel):
     question: str = Field(min_length=3, max_length=500)
     k: int = Field(default=5, ge=1, le=10)
     model: str | None = None
+    route: Literal["auto", "rag", "sql"] = "auto"
 
 
 class Source(BaseModel):
@@ -30,6 +31,9 @@ class AskResponse(BaseModel):
     sources: list[Source]
     model: str
     seconds: float
+    route: str = "rag"
+    sql: str | None = None
+    table: list[dict] | None = None
 
 
 class SearchRequest(BaseModel):
