@@ -1,0 +1,22 @@
+[
+  {"q": "¿Cuántos vehículos registró Toyota en 2026?", "expected": ["marca_anual:TOYOTA:2026"]},
+  {"q": "ventas de BYD durante 2025", "expected": ["marca_anual:BYD:2025"]},
+  {"q": "participación de los vehículos eléctricos en 2026", "expected": ["combustible_anual:ELECTRICO:2026"]},
+  {"q": "cómo estuvo el mercado automotriz en marzo de 2026", "expected": ["mercado_mensual:2026-03"]},
+  {"q": "cuántos vehículos se registraron en Pichincha en 2025", "expected": ["provincia_anual:PICHINCHA:2025"]},
+  {"q": "crecimiento de Chevrolet entre enero y septiembre de 2026 frente a 2025", "expected": ["comparativo:CHEVROLET:2025-2026"]},
+  {"q": "registros de Kia en julio de 2026", "expected": ["marca_mensual:KIA:2026-07"]},
+  {"q": "variación de Hyundai en abril 2026", "expected": ["marca_mensual:HYUNDAI:2026-04"]},
+  {"q": "vehículos diésel registrados en 2025", "expected": ["combustible_anual:DIESEL:2025"]},
+  {"q": "qué significa la variable avalúo", "expected": ["diccionario:AVALÚO"]},
+  {"q": "qué es el campo tipo de transacción", "expected": ["diccionario:TIPO TRANSACCIÓN"]},
+  {"q": "septiembre de 2026 récord histórico de ventas AEADE", "expected": ["aeade:2026-09:p4"]},
+  {"q": "top 20 marcas más vendidas según AEADE", "expected": ["aeade:2026-09:p5", "aeade:2026-08:p4", "aeade:2026-07:p4"]},
+  {"q": "los híbridos crecieron 81 % entre enero y septiembre", "expected": ["aeade:2026-09:p16"]},
+  {"q": "ventas por provincia, Manabí creció 75,5 %", "expected": ["aeade:2026-09:p13"]},
+  {"q": "modelos eléctricos más vendidos BYD Yuan Pro Seagull", "expected": ["aeade:2026-09:p15"]},
+  {"q": "de qué países llegan los vehículos, China 56,8 %", "expected": ["aeade:2026-09:p12"]},
+  {"q": "Great Wall camionetas 2026", "expected": ["marca_anual:GREAT WALL:2026"]},
+  {"q": "ranking de ventas por provincia Pichincha Guayas Azuay AEADE", "expected": ["aeade:2026-09:p13", "aeade:2026-08:p12", "aeade:2026-07:p11"]},
+  {"q": "autos a gasolina contra diésel participación por tipo de energía", "expected": ["aeade:2026-09:p17", "aeade:2026-08:p16", "aeade:2026-07:p16"]}
+]

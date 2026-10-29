@@ -15,7 +15,7 @@ from pypdf import PdfReader
 MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
          "septiembre", "octubre", "noviembre", "diciembre"]
 ABREV = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
-HEADER_STARTS = ("Marca", "Segmento", "Energía", "Provincias", "Origen")
+HEADER_STARTS = ("Marca", "Segmento", "Energía", "Provincias", "Origen", "Part.", "Var.", "Var ")
 FLECHAS = {"🡱": "(sube)", "🡳": "(baja)"}
 MONTH_LINE = re.compile(r"^(ENERO|FEBRERO|MARZO|ABRIL|MAYO|JUNIO|JULIO|AGOSTO|SEPTIEMBRE|OCTUBRE|NOVIEMBRE|DICIEMBRE)\s*$")
 FUENTE = "AEADE (datos del SRI)"

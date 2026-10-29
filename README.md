@@ -56,3 +56,17 @@ Se corrige que las tablas traigan el encabezado del mes anterior, se reconstruye
 los gráficos de barras y se advierte que los gráficos circulares pierden la asociación etiqueta-porcentaje.
 Las cifras de AEADE y las del SRI procesado no coinciden (distinta cobertura y definición de venta):
 el RAG debe citar la fuente y no mezclarlas.
+
+## Etapas 4 y 5: recuperación y generación (todo local, sin costo)
+
+```
+python scripts/search.py "ventas de BYD en 2025" --mode hybrid --no-rerank
+python scripts/eval_retrieval.py --verbose       # BM25 vs semántica vs híbrida vs reranker
+python scripts/ask.py "¿Cuántos vehículos registró Toyota en 2026?"
+```
+
+- Recuperación: BM25 propio + embeddings BGE-M3 fusionados con RRF; filtros de metadatos extraídos de la
+  pregunta (`src/retrieval/query.py`); reranker BGE opcional.
+- Generación: LLM local con Ollama. Requiere instalar Ollama (https://ollama.com) y `ollama pull qwen2.5:3b-instruct`.
+- Guardrail (`src/generation/guardrails.py`): toda cifra de la respuesta debe aparecer en los fragmentos
+  recuperados y toda cita `[n]` debe existir; si falla, se reintenta una vez y si persiste se rechaza la respuesta.
