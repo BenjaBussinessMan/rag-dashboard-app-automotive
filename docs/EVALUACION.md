@@ -37,7 +37,7 @@ referencia escrita a mano. Un SQL distinto pero con el mismo resultado cuenta co
 columnas adicionales y diferencias de redondeo (por ejemplo `21880,3` frente a `21880`), pero no diferencias en los
 valores; también se informa la comparación estricta.
 
-**qwen2.5:3b-instruct**: 26/31 correctas (84 %) (comparación estricta, que exige columnas y redondeo idénticos: 24/31); 3.4 s por consulta en promedio. Por categoría: conteo 10/10, filtros_multiples 5/5, tiempo 3/3, porcentaje 2/4, ranking 3/5, estadistica 3/4.
+**qwen2.5:3b-instruct**: 26/31 correctas (84 %) (comparación estricta, que exige columnas y redondeo idénticos: 24/31); 3.5 s por consulta en promedio. Por categoría: conteo 10/10, filtros_multiples 5/5, tiempo 3/3, porcentaje 2/4, ranking 3/5, estadistica 3/4.
 
 - Falla: *¿Qué porcentaje de los registros de 2026 fueron eléctricos?* — esperado `[[5.0]]`, obtenido `[[100.0]]`
 - Falla: *¿Cuánto creció, en porcentaje, el total de registros de enero a septiembre de 2026 frente al mismo periodo de 2025?* — esperado `[[40.9]]`, obtenido `[[7821899.0]]`
@@ -45,7 +45,7 @@ valores; también se informa la comparación estricta.
 - Falla: *¿Cuál es el combustible con más registros en 2026?* — esperado `[['DIESEL']]`, obtenido `[['GASOLINA', 20.0]]`
 - Falla: *¿Cuál es el avalúo mediano de los Kia en 2026?* — esperado `[[16199.0]]`, obtenido `[[875038.1]]`
 
-**qwen2.5:7b-instruct**: 31/31 correctas (100 %) (comparación estricta, que exige columnas y redondeo idénticos: 26/31); 9.6 s por consulta en promedio. Por categoría: conteo 10/10, filtros_multiples 5/5, tiempo 3/3, porcentaje 4/4, ranking 5/5, estadistica 4/4.
+**qwen2.5:7b-instruct**: 31/31 correctas (100 %) (comparación estricta, que exige columnas y redondeo idénticos: 26/31); 17.5 s por consulta en promedio. Por categoría: conteo 10/10, filtros_multiples 5/5, tiempo 3/3, porcentaje 4/4, ranking 5/5, estadistica 4/4.
 
 ## 3. Asistente completo
 
@@ -55,12 +55,11 @@ rechazarse.
 
 | Modelo | Correctas | sql | documentos | aeade | rechazo | Ruta esperada | s por pregunta |
 |---|---|---|---|---|---|---|---|
-| qwen2.5:3b-instruct | 19/24 (79 %) | 7/10 | 4/4 | 4/5 | 4/5 | 21/24 | 6.3 |
-| qwen2.5:7b-instruct | 22/24 (92 %) | 9/10 | 4/4 | 4/5 | 5/5 | 22/24 | 58.3 |
+| qwen2.5:3b-instruct | 20/24 (83 %) | 8/10 | 4/4 | 4/5 | 4/5 | 23/24 | 9.1 |
+| qwen2.5:7b-instruct | 22/24 (92 %) | 9/10 | 4/4 | 4/5 | 5/5 | 24/24 | 87.3 |
 
 **Fallos de qwen2.5:3b-instruct**
 
-- *¿Cuántos vehículos registró Toyota en 2026 según el SRI?* (ruta sql): falta la cifra 2433
 - *¿Qué porcentaje de los registros de 2026 fueron eléctricos?* (ruta sql): falta la cifra 5
 - *¿Cuánto creció, en porcentaje, el total de registros de enero a septiembre de 2026 frente al mismo periodo de 2025?* (ruta sql): falta la cifra 40.9
 - *¿Cuánto crecieron las ventas de híbridos entre enero y septiembre según AEADE?* (ruta rag): falta la cifra 81
@@ -71,4 +70,21 @@ rechazarse.
 - *¿Cuánto creció Chevrolet entre enero y septiembre de 2026 frente a 2025?* (ruta sql): falta la cifra 9.6
 - *¿Cuántos vehículos se vendieron en septiembre de 2026 según el boletín de AEADE?* (ruta rag): falta la cifra 15649
 
+## 4. Hallazgos y límites
+
+- **Recuperación.** La búsqueda híbrida solo supera a los embeddings cuando se le suma el entendimiento de la consulta
+  (filtros por año, marca, provincia y combustible). Sin él, BM25 arrastra la fusión hacia los resúmenes mensuales.
+  El reranker no justifica sus 2 GB: ayuda con términos exactos y daña las consultas estructuradas. Un peso adaptativo de
+  BM25 para términos raros se probó y no funcionó (RRF premia el consenso), por lo que se retiró.
+- **Text-to-SQL.** El modelo de 7B resuelve las 31 preguntas; el de 3B escribe SQL erróneo con seguridad
+  (por ejemplo, un porcentaje de 100 en lugar de 5). Para cifras exactas se recomienda el 7B. La interfaz muestra siempre la
+  consulta para poder auditarla.
+- **Guardrail.** Verifica que cada cifra exista en el fragmento citado, no que ese fragmento sea el adecuado para la
+  pregunta. Es la causa de los fallos que quedan en las preguntas sobre AEADE.
+- **Preguntas ambiguas.** "¿Cuánto creció Chevrolet?" admite dos lecturas (unidades o porcentaje). No se ajustó el criterio
+  para que pase.
+- **Sesgo de la medición.** Las reglas del parser y del prompt se afinaron viendo los fallos de estos mismos sets; un
+  conjunto de validación separado daría una cifra más conservadora.
+- **Alcance.** SRI 2025-2026 (automóvil, camión y camioneta) y tres boletines de AEADE. Las cifras de ambas fuentes no
+  coinciden y no se concilian.
 

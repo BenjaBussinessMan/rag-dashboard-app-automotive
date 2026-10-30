@@ -1,7 +1,13 @@
+# Datos crudos: se descargan con scripts/download_sri.py (los CSV pesan ~550 MB).
+# Se versionan solo el diccionario de datos del SRI (38 KB, necesario para el ETL) y el .gitkeep.
 data/raw/*
 !data/raw/.gitkeep
+!data/raw/SRI_Vehiculos_DD.xlsx
+
+# Todo lo de data/processed se regenera con los scripts del pipeline.
+data/processed/*
+!data/processed/.gitkeep
+
 .venv/
 __pycache__/
 .pytest_cache/
-data/processed/*
-!data/processed/.gitkeep

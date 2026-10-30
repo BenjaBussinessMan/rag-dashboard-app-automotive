@@ -68,7 +68,8 @@ def test_asistente_responde_con_sql_y_fuentes():
     assert not at.exception
     textos = " ".join(m.value for m in at.markdown)
     assert "Toyota registró 2.433 vehículos" in textos and "Cifra calculada con una consulta SQL" in " ".join(c.value for c in at.caption)
-    assert [e.label for e in at.expander] == ["Consulta SQL y resultado", "Fuentes consultadas (1)"]
+    # AppTest conserva lo dibujado antes del st.rerun(); en la interfaz real solo queda la version final
+    assert {e.label for e in at.expander} == {"Consulta SQL y resultado", "Fuentes consultadas (1)"}
 
 
 def test_dashboard_muestra_indicadores():

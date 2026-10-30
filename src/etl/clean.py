@@ -133,6 +133,11 @@ def run_etl(raw_dir: Path, out_dir: Path, years=None) -> list[dict]:
     files = sorted(raw_dir.glob("SRI_Vehiculos_Nuevos_*.csv"))
     reports = []
     xlsx = raw_dir / catalogs.DICTIONARY_FILE
+    if not files:
+        raise FileNotFoundError(f"No hay CSV en {raw_dir}. Ejecuta primero: python scripts/download_sri.py")
+    if not xlsx.exists():
+        raise FileNotFoundError(f"Falta el diccionario de datos {xlsx}. Viene incluido en el repositorio "
+                                "(data/raw/SRI_Vehiculos_DD.xlsx); si lo borraste, recupéralo con `git checkout`.")
     dim_canton = catalogs.load_dim_canton(xlsx)
     dim_color = catalogs.load_dim_color(xlsx)
     out_dir.mkdir(parents=True, exist_ok=True)

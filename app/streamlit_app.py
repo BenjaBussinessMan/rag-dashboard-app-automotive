@@ -149,6 +149,7 @@ def page_asistente(health: dict | None) -> None:
                     return
                 render_response(resp)
             st.session_state.history.append({"question": question, "response": resp})
+            st.rerun()  # redibuja en orden: historial arriba y el cuadro de entrada debajo
 
 
 # ---------------------------------------------------------------- dashboard
