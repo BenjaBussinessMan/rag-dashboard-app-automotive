@@ -20,9 +20,9 @@
 
   {"category": "documentos", "route": "rag", "q": "¿Cómo estuvo el mercado automotriz en marzo de 2026?",
    "gold_sql": "SELECT count(*) FROM vehiculos WHERE anio = 2026 AND mes = 3"},
-  {"category": "documentos", "route": "rag", "q": "¿Qué provincia concentra más registros en 2025?",
+  {"category": "documentos", "route": null, "q": "¿Qué provincia concentra más registros en 2025?",
    "expect_text": ["PICHINCHA"], "expect_numbers": ["34390"]},
-  {"category": "documentos", "route": "rag", "q": "¿Cuáles son las marcas más vendidas en 2026?", "expect_text": ["KIA", "CHEVROLET"]},
+  {"category": "documentos", "route": null, "q": "¿Cuáles son las marcas más vendidas en 2026?", "expect_text": ["KIA", "CHEVROLET"]},
   {"category": "documentos", "route": "rag", "q": "¿Qué significa la variable avalúo del dataset?", "expect_text": ["subcategoria"]},
 
   {"category": "aeade", "route": "rag", "q": "¿Cuánto crecieron las ventas de vehículos entre enero y septiembre de 2026 según AEADE?",

@@ -140,3 +140,25 @@ def test_sin_datos_rechaza_en_lugar_de_inventar(con, parser):
     # un SQL valido que ademas menciona SIN_DATOS en un comentario de texto no cuenta como rechazo
     llm2 = FakeLLM("SIN_DATOS\n" + KIA_SQL, "Kia registró 2 vehículos.")
     assert SQLPipeline(con, llm2, parser).answer("¿Cuántos Kia se registraron en 2026?").table == [{"registros": 2}]
+
+
+def test_cero_sospechoso_se_corrige_una_vez(con, parser):
+    contradictorio = "```sql\nSELECT count(*) AS registros FROM vehiculos WHERE marca = 'KIA' AND marca = 'TOYOTA'\n```"
+    llm = FakeLLM(contradictorio, KIA_SQL, "Kia registró 2 vehículos.")
+    ans = SQLPipeline(con, llm, parser).answer("¿Cuántos Kia se registraron en 2026?")
+    assert ans.table == [{"registros": 2}]
+    assert "devolvió 0, pero existen 2 registros" in llm.calls[1][-1]["content"]
+
+
+def test_cero_legitimo_no_se_corrige_mas_de_una_vez(con, parser):
+    cero = "```sql\nSELECT count(*) AS registros FROM vehiculos WHERE marca = 'KIA' AND combustible = 'DIESEL'\n```"
+    llm = FakeLLM(cero, cero, "No hay Kia a diésel: 0 registros.")
+    ans = SQLPipeline(con, llm, parser).answer("¿Cuántos Kia a diésel se registraron en 2026?")
+    assert ans.table == [{"registros": 0}] and len(llm.calls) == 3  # SQL, SQL reintentado, redaccion
+
+
+def test_cero_sin_entidades_reconocidas_se_acepta_sin_reintento(con, parser):
+    futuro = "```sql\nSELECT count(*) AS registros FROM vehiculos WHERE fecha_proceso > TIMESTAMP '2030-01-01'\n```"
+    llm = FakeLLM(futuro, "No hay registros con fecha posterior a 2030.")
+    ans = SQLPipeline(con, llm, parser).answer("¿Cuántos registros tienen fecha de proceso futura?")
+    assert ans.table == [{"registros": 0}] and len(llm.calls) == 2  # SQL + redaccion: no hay con que contrastar el cero

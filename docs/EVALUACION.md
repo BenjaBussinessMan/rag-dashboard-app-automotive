@@ -37,25 +37,15 @@ referencia escrita a mano. Un SQL distinto pero con el mismo resultado cuenta co
 columnas adicionales y diferencias de redondeo (por ejemplo `21880,3` frente a `21880`), pero no diferencias en los
 valores; también se informa la comparación estricta.
 
-**qwen2.5:3b-instruct**: 23/31 correctas (74 %); 3.7 s por consulta en promedio. Por categoría: conteo 10/10, filtros_multiples 4/5, tiempo 1/3, porcentaje 2/4, ranking 4/5, estadistica 2/4.
+**qwen2.5:3b-instruct**: 26/31 correctas (84 %) (comparación estricta, que exige columnas y redondeo idénticos: 24/31); 3.4 s por consulta en promedio. Por categoría: conteo 10/10, filtros_multiples 5/5, tiempo 3/3, porcentaje 2/4, ranking 3/5, estadistica 3/4.
 
-- Falla: *¿Cuántos Toyota Hilux se registraron en 2026?* — esperado `[[1824.0]]`, obtenido `[[0.0]]`
-- Falla: *¿Cuántos vehículos se registraron entre enero y junio de 2026?* — esperado `[[50761.0]]`, obtenido `[[16679.0]]`
-- Falla: *¿En qué mes de 2026 hubo más registros?* — esperado `[[4.0]]`, obtenido `[[4.0, 9589.0, 12.3]]`
-- Falla: *¿Cuánto creció, en porcentaje, el total de registros de enero a septiembre de 2026 frente al mismo periodo de 2025?* — esperado `[[40.9]]`, obtenido `[[1674700.0]]`
-- Falla: *¿Cuántos vehículos más se registraron en enero-septiembre de 2026 que en el mismo periodo de 2025?* — esperado `[[22707.0]]`, obtenido `[[55512.0, 78219.0]]`
+- Falla: *¿Qué porcentaje de los registros de 2026 fueron eléctricos?* — esperado `[[5.0]]`, obtenido `[[100.0]]`
+- Falla: *¿Cuánto creció, en porcentaje, el total de registros de enero a septiembre de 2026 frente al mismo periodo de 2025?* — esperado `[[40.9]]`, obtenido `[[7821899.0]]`
+- Falla: *¿Cuáles son las 5 provincias con más registros en 2025?* — esperado `[['PICHINCHA', 34390.0], ['GUAYAS', 21843.0], ['AZUAY', 7283.0], ['TUNGURAHUA', 5169.0], ['MANABI', 2393.0]]`, obtenido `[['QUITO', 2025.0, 22537.0], ['GUAYAQUIL', 2025.0, 18248.0], ['AMBATO', 2025.0, 4964.0], ['SAN MIGUEL DE LOS BANCOS', 2025.0, 3788.0], ['PEDRO VICENTE MALDONADO', 2025.0, 3285.0]]`
 - Falla: *¿Cuál es el combustible con más registros en 2026?* — esperado `[['DIESEL']]`, obtenido `[['GASOLINA', 20.0]]`
-- Falla: *¿Cuál es el avalúo mediano de los Kia en 2026?* — esperado `[[16199.0]]`, obtenido `None`
-- Falla: *¿Cuál es el avalúo promedio de los vehículos eléctricos en 2026?* — esperado `[[21880.0]]`, obtenido `[[21880.3]]`
+- Falla: *¿Cuál es el avalúo mediano de los Kia en 2026?* — esperado `[[16199.0]]`, obtenido `[[875038.1]]`
 
-**qwen2.5:7b-instruct**: 25/31 correctas (81 %); 9.8 s por consulta en promedio. Por categoría: conteo 10/10, filtros_multiples 4/5, tiempo 2/3, porcentaje 4/4, ranking 3/5, estadistica 2/4.
-
-- Falla: *¿Cuántos Toyota Hilux se registraron en 2026?* — esperado `[[1824.0]]`, obtenido `[[0.0]]`
-- Falla: *¿En qué mes de 2026 hubo más registros?* — esperado `[[4.0]]`, obtenido `[[4.0, 9589.0]]`
-- Falla: *¿Cuál es la marca con más registros en Guayas en 2026?* — esperado `[['CHEVROLET']]`, obtenido `[['CHEVROLET', 3514.0]]`
-- Falla: *¿Cuál es el combustible con más registros en 2026?* — esperado `[['DIESEL']]`, obtenido `[['DIESEL', 37264.0, 47.6]]`
-- Falla: *¿Cuál es el avalúo promedio de los vehículos eléctricos en 2026?* — esperado `[[21880.0]]`, obtenido `[[21880.3]]`
-- Falla: *¿Cuál es el cilindraje promedio de los vehículos a gasolina en 2025?* — esperado `[[1493.0]]`, obtenido `[[1493.4]]`
+**qwen2.5:7b-instruct**: 31/31 correctas (100 %) (comparación estricta, que exige columnas y redondeo idénticos: 26/31); 9.6 s por consulta en promedio. Por categoría: conteo 10/10, filtros_multiples 5/5, tiempo 3/3, porcentaje 4/4, ranking 5/5, estadistica 4/4.
 
 ## 3. Asistente completo
 
@@ -65,25 +55,20 @@ rechazarse.
 
 | Modelo | Correctas | sql | documentos | aeade | rechazo | Ruta esperada | s por pregunta |
 |---|---|---|---|---|---|---|---|
-| qwen2.5:3b-instruct | 17/24 (71 %) | 6/10 | 3/4 | 4/5 | 4/5 | 20/24 | 7.9 |
-| qwen2.5:7b-instruct | 19/24 (79 %) | 8/10 | 3/4 | 4/5 | 4/5 | 21/24 | 47.9 |
+| qwen2.5:3b-instruct | 19/24 (79 %) | 7/10 | 4/4 | 4/5 | 4/5 | 21/24 | 6.3 |
+| qwen2.5:7b-instruct | 22/24 (92 %) | 9/10 | 4/4 | 4/5 | 5/5 | 22/24 | 58.3 |
 
 **Fallos de qwen2.5:3b-instruct**
 
-- *¿Cuáles son las 3 marcas con más registros en 2026?* (ruta rag): rechazo una pregunta contestable; falta la cifra 10977; falta la cifra 12198; falta la cifra 5433; falta el texto 'KIA'; falta el texto 'CHEVROLET'; falta el texto 'CHERY'
-- *¿En qué provincia se registraron más vehículos BYD en 2026?* (ruta rag): falta la cifra 1013
+- *¿Cuántos vehículos registró Toyota en 2026 según el SRI?* (ruta sql): falta la cifra 2433
+- *¿Qué porcentaje de los registros de 2026 fueron eléctricos?* (ruta sql): falta la cifra 5
 - *¿Cuánto creció, en porcentaje, el total de registros de enero a septiembre de 2026 frente al mismo periodo de 2025?* (ruta sql): falta la cifra 40.9
-- *¿En qué mes de 2026 hubo más registros?* (ruta rag): falta el texto 'abril'
-- *¿Cuáles son las marcas más vendidas en 2026?* (ruta rag): rechazo una pregunta contestable; falta el texto 'KIA'; falta el texto 'CHEVROLET'
 - *¿Cuánto crecieron las ventas de híbridos entre enero y septiembre según AEADE?* (ruta rag): falta la cifra 81
 - *¿Cuántos vehículos usados se vendieron en 2026?* (ruta sql): debia rechazar y respondio
 
 **Fallos de qwen2.5:7b-instruct**
 
-- *¿Cuáles son las 3 marcas con más registros en 2026?* (ruta rag): rechazo una pregunta contestable; falta la cifra 10977; falta la cifra 12198; falta la cifra 5433; falta el texto 'KIA'; falta el texto 'CHEVROLET'; falta el texto 'CHERY'
-- *¿En qué mes de 2026 hubo más registros?* (ruta rag): rechazo una pregunta contestable; falta el texto 'abril'
-- *¿Cuáles son las marcas más vendidas en 2026?* (ruta rag): rechazo una pregunta contestable; falta el texto 'KIA'; falta el texto 'CHEVROLET'
+- *¿Cuánto creció Chevrolet entre enero y septiembre de 2026 frente a 2025?* (ruta sql): falta la cifra 9.6
 - *¿Cuántos vehículos se vendieron en septiembre de 2026 según el boletín de AEADE?* (ruta rag): falta la cifra 15649
-- *¿Cuántos vehículos usados se vendieron en 2026?* (ruta sql): debia rechazar y respondio
 
 

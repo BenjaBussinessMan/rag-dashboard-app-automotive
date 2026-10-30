@@ -127,13 +127,38 @@ class SQLPipeline:
             try:
                 if not sql:
                     raise ValueError("no se encontró una consulta SQL en la respuesta")
-                return sql, run_select(self.con, sql, MAX_ROWS)
+                df = run_select(self.con, sql, MAX_ROWS)
+                existentes = self._suspicious_zero(df, question)
+                if existentes and attempt == 0:
+                    messages += [{"role": "assistant", "content": raw},
+                                 {"role": "user", "content": (
+                                     f"Tu consulta devolvió 0, pero existen {n(existentes)} registros que cumplen las condiciones "
+                                     "de la pregunta (año, marca, provincia...). Revisa tus filtros: no uses condiciones "
+                                     "contradictorias y busca modelos con ILIKE. Responde solo con el SQL corregido.")}]
+                    continue
+                return sql, df
             except (UnsafeQuery, duckdb.Error, ValueError) as exc:
                 if attempt == 1:
                     return None
                 messages += [{"role": "assistant", "content": raw},
                              {"role": "user", "content": f"Esa consulta falló: {exc}. Corrígela y responde solo con el SQL."}]
         return None
+
+    def _suspicious_zero(self, df: pd.DataFrame, question: str) -> int:
+        """Si el resultado es 0 (o vacio) pero las condiciones reconocidas en la pregunta si tienen registros, devuelve
+        cuantos; suele indicar un SQL con filtros contradictorios. 0 = el cero es plausible."""
+        es_cero = df.empty or (df.shape == (1, 1) and pd.api.types.is_number(df.iloc[0, 0]) and df.iloc[0, 0] == 0)
+        if not es_cero:
+            return 0
+        f = self.parser.parse(question)
+        conds, params = [], []
+        for col in ("anio", "mes", "marca", "provincia", "combustible"):
+            if col in f:
+                conds.append(f"{col} IN ({', '.join('?' for _ in f[col])})")
+                params += f[col]
+        if not conds:
+            return 0
+        return self.con.execute("SELECT count(*) FROM vehiculos WHERE " + " AND ".join(conds), params).fetchone()[0]
 
     def _loaded_years(self) -> set[int]:
         return {r[0] for r in self.con.execute("SELECT DISTINCT anio FROM vehiculos").fetchall()}
